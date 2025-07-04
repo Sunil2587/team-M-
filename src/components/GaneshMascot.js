@@ -7,7 +7,7 @@ export default function GaneshMascot() {
       <img
         src={Ganeshsvg}
         alt="Ganesh Mascot"
-        className="w-36 h-36 #2d0900 rounded-full shadow-lg"
+        className="w-36 h-46 #2d0900 rounded-full shadow-lg"
         draggable={false}
       />
     </div>

@@ -117,6 +117,16 @@ export default function Dashboard() {
     },
   ];
 
+  // Delete event handler
+  async function handleDeleteEvent(eventId) {
+    if (window.confirm("Are you sure you want to delete this event?")) {
+      const { error } = await supabase.from("events").delete().eq("id", eventId);
+      if (!error) {
+        setUpcomingEvents((prev) => prev.filter(ev => ev.id !== eventId));
+      }
+    }
+  }
+
   return (
     <div
       className="min-h-screen flex items-center justify-center"
@@ -261,9 +271,18 @@ export default function Dashboard() {
             ) : (
               <ul className="space-y-1 w-full">
                 {upcomingEvents.map(ev => (
-                  <li key={ev.id} className="text-sm text-yellow-800 flex flex-col">
-                    <span className="font-semibold">{ev.title}</span>
-                    <span className="text-xs text-gray-600">{new Date(ev.date).toLocaleDateString()}</span>
+                  <li key={ev.id} className="text-sm text-yellow-800 flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="font-semibold">{ev.title}</span>
+                      <span className="text-xs text-gray-600">{new Date(ev.date).toLocaleDateString()}</span>
+                    </div>
+                    <button
+                      className="ml-2 px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition"
+                      onClick={() => handleDeleteEvent(ev.id)}
+                      title="Delete Event"
+                    >
+                      Delete
+                    </button>
                   </li>
                 ))}
               </ul>

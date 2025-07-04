@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import PageContainer from "../components/PageContainer";
 import BackgroundWrapper from "../components/BackgroundWrapper";
 import { supabase } from "../supabaseClient";
 
-// Replace with your actual logged-in user logic
-const currentUserName = "Samba";
+const currentUserName = localStorage.getItem("profileName") || "Anonymous";
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
@@ -12,39 +11,55 @@ export default function Chat() {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  useEffect(() => {
-    fetchMessages();
-    // Optionally, subscribe to real-time updates
-    const subscription = supabase
-      .channel('public:chat')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat' }, fetchMessages)
-      .subscribe();
-    return () => { subscription.unsubscribe(); };
-  }, []);
-
-  async function fetchMessages() {
+  // Fetch messages function, memoized to avoid useEffect warning
+  const fetchMessages = useCallback(async () => {
     const { data, error } = await supabase
-      .from("chat")
+      .from("chats")
       .select("*")
       .order("created_at", { ascending: true });
     if (!error) setMessages(data || []);
-    // Scroll to bottom on new message
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-  }
+    scrollToBottom();
+  }, []);
 
+  // Scroll to bottom helper
+  const scrollToBottom = () => {
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+  };
+
+  // Initial fetch and real-time subscription
+  useEffect(() => {
+    fetchMessages();
+
+    const channel = supabase
+      .channel("public:chats")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chats" },
+        (payload) => {
+          setMessages((prev) => [...prev, payload.new]);
+          scrollToBottom();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchMessages]);
+
+  // Send message
   async function handleSend(e) {
     e.preventDefault();
     if (!input.trim()) return;
     setLoading(true);
-    await supabase.from("chat").insert([{ user: currentUserName, message: input }]);
+    await supabase.from("chats").insert([{ sender: currentUserName, message: input }]);
     setInput("");
     setLoading(false);
-    fetchMessages();
+    // No need to fetchMessages; realtime will update
   }
 
-  // Emoji picker (simple)
+  // Emoji picker
   const emojis = ["😀", "😂", "😍", "🙏", "🎉", "👍", "🔥", "🥳", "😎", "❤️"];
-
   function handleEmojiClick(emoji) {
     setInput(input + emoji);
   }
@@ -56,17 +71,20 @@ export default function Chat() {
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`mb-2 flex ${msg.user === currentUserName ? "justify-end" : "justify-start"}`}
+              className={`mb-2 flex ${msg.sender === currentUserName ? "justify-end" : "justify-start"}`}
             >
               <div
                 className={`px-3 py-2 rounded-lg max-w-[70%] ${
-                  msg.user === currentUserName
+                  msg.sender === currentUserName
                     ? "bg-yellow-400 text-white"
                     : "bg-white/80 text-yellow-900"
                 }`}
               >
-                <span className="block text-xs font-bold mb-1">{msg.user}</span>
+                <span className="block text-xs font-bold mb-1">{msg.sender}</span>
                 <span className="break-words">{msg.message}</span>
+                <span className="block text-[10px] text-right text-gray-500 mt-1">
+                  {msg.created_at && new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
               </div>
             </div>
           ))}

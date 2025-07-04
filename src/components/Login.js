@@ -17,6 +17,39 @@ function isPhoneNumber(input) {
   return /^\+91\d{10}$/.test(input);
 }
 
+// Ensure user exists in users table
+async function ensureUserInUsersTable() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { data } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+    if (!data) {
+      await supabase.from("users").insert([
+        {
+          id: user.id,
+          name:
+            user.user_metadata?.full_name ||
+            user.user_metadata?.name ||
+            user.email ||
+            "Unnamed",
+          photo: user.user_metadata?.avatar_url || "",
+        },
+      ]);
+    }
+    // Optionally, store name in localStorage for profile/task use
+    localStorage.setItem(
+      "profileName",
+      user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email ||
+        "Unnamed"
+    );
+  }
+}
+
 export default function Login() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -48,7 +81,10 @@ export default function Login() {
     });
     setLoading(false);
     if (error) alert(error.message);
-    else navigate("/dashboard");
+    else {
+      await ensureUserInUsersTable();
+      navigate("/dashboard");
+    }
   };
 
   // Phone/OTP login
@@ -71,7 +107,10 @@ export default function Login() {
     });
     setLoading(false);
     if (error) alert(error.message);
-    else navigate("/dashboard");
+    else {
+      await ensureUserInUsersTable();
+      navigate("/dashboard");
+    }
   };
 
   // Google login (with redirect)
@@ -79,27 +118,14 @@ export default function Login() {
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/dashboard`
-      }
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
     });
   };
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#FFF8E1] via-[#FFE0B2] to-[#FFD700] overflow-hidden px-2">
-      {/* Background flowers */}
-      <img
-        src="/flower-top-left.svg"
-        alt=""
-        className="absolute top-0 left-0 w-32 opacity-60 z-0 pointer-events-none select-none"
-        aria-hidden="true"
-      />
-      <img
-        src="/flower-bottom-right.svg"
-        alt=""
-        className="absolute bottom-0 right-0 w-40 opacity-60 z-0 pointer-events-none select-none"
-        aria-hidden="true"
-      />
-      {/* Main Content */}
+      {/* ...background and mascot code... */}
       <GaneshMascot />
       <h1
         className="text-4xl font-extrabold mb-8 tracking-wider text-center z-10"
@@ -114,13 +140,6 @@ export default function Login() {
       >
         TEAM MAHODARA
       </h1>
-      {/* Add this to your global CSS or inside a <style> tag:
-      @keyframes popIn {
-        0% { opacity: 0; transform: scale(0.7) translateY(-30px);}
-        60% { opacity: 1; transform: scale(1.1) translateY(8px);}
-        100% { opacity: 1; transform: scale(1) translateY(0);}
-      }
-      */}
       <AuthCard>
         <form
           className="w-full"

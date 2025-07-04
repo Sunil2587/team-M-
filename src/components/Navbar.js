@@ -10,13 +10,13 @@ import {
 import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
-  { to: "/", icon: <HomeIcon className="w-6 h-6" />, label: "Home" },
-  { to: "/expenses", icon: <CurrencyRupeeIcon className="w-6 h-6" />, label: "Expenses" },
-  { to: "/contributions", icon: <GiftIcon className="w-6 h-6" />, label: "Contributions" },
-  { to: "/tasks", icon: <ClipboardDocumentCheckIcon className="w-6 h-6" />, label: "Tasks" },
-  { to: "/gallery", icon: <PhotoIcon className="w-6 h-6" />, label: "Gallery" },
-  { to: "/sponsors", icon: <UserGroupIcon className="w-6 h-6" />, label: "Sponsors" },
-  { to: "/chat", icon: <ChatBubbleLeftRightIcon className="w-6 h-6" />, label: "Chat" },
+  { to: "/", icon: <HomeIcon className="w-6 h-6" />, label: "" },
+  { to: "/expenses", icon: <CurrencyRupeeIcon className="w-6 h-6" />, label: "" },
+  { to: "/contributions", icon: <GiftIcon className="w-6 h-6" />, label: "" },
+  { to: "/tasks", icon: <ClipboardDocumentCheckIcon className="w-6 h-6" />, label: "" },
+  { to: "/gallery", icon: <PhotoIcon className="w-6 h-6" />, label: "" },
+  { to: "/sponsors", icon: <UserGroupIcon className="w-6 h-6" />, label: "" },
+  { to: "/chat", icon: <ChatBubbleLeftRightIcon className="w-6 h-6" />, label: "" },
 ];
 
 export default function BottomNavBar() {
@@ -34,14 +34,14 @@ export default function BottomNavBar() {
           <Link
             key={item.to}
             to={item.to}
-            className={`flex flex-col items-center text-xs ${
+            className={`flex flex-col items-center ${
               location.pathname === item.to
                 ? "text-[#E65100]"
                 : "text-gray-500"
             }`}
           >
             {item.icon}
-            <span className="mt-1">{item.label}</span>
+            <span className="mt-1 text-[10px]">{item.label}</span>
           </Link>
         ))}
       </div>

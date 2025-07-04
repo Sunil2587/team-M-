@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import PageContainer from "./PageContainer";
+import BackgroundWrapper from "../components/BackgroundWrapper";
 import { supabase } from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
 
@@ -8,6 +9,8 @@ export default function Profile() {
     name: "",
     contact: "",
     photo: "",
+    email: "",
+    id: "",
   });
   const [editing, setEditing] = useState(false);
   const [newName, setNewName] = useState("");
@@ -15,22 +18,26 @@ export default function Profile() {
   const [newPhoto, setNewPhoto] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [userId, setUserId] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const navigate = useNavigate();
 
-  // Get the authenticated user's ID from Supabase Auth
+  // Get the authenticated user's ID and email from Supabase Auth
   useEffect(() => {
     async function getUser() {
       let user;
       if (supabase.auth.getUser) {
-        // Newer supabase-js v2
         const { data } = await supabase.auth.getUser();
         user = data?.user;
       } else {
-        // Older supabase-js v1
         user = supabase.auth.user();
       }
       setUserId(user?.id);
+      setProfile((prev) => ({
+        ...prev,
+        email: user?.email || "",
+        id: user?.id || "",
+      }));
     }
     getUser();
   }, []);
@@ -62,18 +69,21 @@ export default function Profile() {
         .from("users")
         .insert([{ id: userId, name: "", contact: "", photo: "" }]);
       if (insertError) {
-        console.error("Error inserting new user:", insertError.message);
+        setErrorMsg("Error inserting new user: " + insertError.message);
       }
-      setProfile({ name: "", contact: "", photo: "" });
+      setProfile((prev) => ({ ...prev, name: "", contact: "", photo: "" }));
       setNewName("");
       setNewContact("");
       return;
     }
     if (error) {
-      console.error("Error fetching profile:", error.message);
+      setErrorMsg("Error fetching profile: " + error.message);
     }
     if (data) {
-      setProfile(data);
+      setProfile((prev) => ({
+        ...prev,
+        ...data,
+      }));
       setNewName(data.name || "");
       setNewContact(data.contact || "");
     }
@@ -82,25 +92,31 @@ export default function Profile() {
   async function handleSave(e) {
     e.preventDefault();
     setUploading(true);
+    setErrorMsg("");
     let photoUrl = profile.photo;
 
     // Handle photo upload if changed
     if (newPhoto) {
       const fileExt = newPhoto.name.split(".").pop();
       const filePath = `profile/${userId}_${Date.now()}.${fileExt}`;
+      // Remove any existing file with the same path (optional, for upsert)
+      await supabase.storage.from("profile-photos").remove([filePath]);
       // Upload the file
       const { error: uploadError } = await supabase.storage
         .from("profile-photos")
         .upload(filePath, newPhoto, { upsert: true });
 
       if (uploadError) {
-        console.error("Photo upload error:", uploadError.message);
+        setErrorMsg("Photo upload error: " + uploadError.message);
       } else {
         // Get the public URL
         const { data: publicUrlData } = supabase.storage
           .from("profile-photos")
           .getPublicUrl(filePath);
         photoUrl = publicUrlData?.publicUrl;
+        if (!photoUrl) {
+          setErrorMsg("Could not get public URL for uploaded photo.");
+        }
       }
     }
 
@@ -111,9 +127,8 @@ export default function Profile() {
       .eq("id", userId);
 
     if (error) {
-      console.error("Profile update error:", error.message);
+      setErrorMsg("Profile update error: " + error.message);
     } else {
-      // Fetch the updated profile to ensure UI is in sync
       await fetchProfile();
       setEditing(false);
       setNewPhoto(null);
@@ -128,16 +143,25 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FFF8E1] p-2 sm:p-4 bg-fixed bg-cover bg-center">
+    <BackgroundWrapper>
       <PageContainer title="PROFILE">
-        <div className="flex flex-col items-center px-6 pb-8">
-          <div className="mb-4">
+        <div
+          className="flex flex-col items-center px-6 pb-8 w-full max-w-md mx-auto border-4 border-yellow-400 rounded-2xl shadow-lg"
+          style={{
+            background: "linear-gradient(135deg, #FFF8E1 80%, #FFE0B2 100%)",
+            boxShadow: "0 4px 24px 0 rgba(255,193,7,0.10)",
+          }}
+        >
+          <div className="mb-4 mt-6">
             <img
               src={profile.photo || "/default-profile.png"}
               alt="Profile"
               className="w-28 h-28 rounded-full object-cover border-4 border-yellow-400 shadow"
             />
           </div>
+          {errorMsg && (
+            <div className="mb-2 text-red-600 text-sm font-semibold">{errorMsg}</div>
+          )}
           {editing ? (
             <form onSubmit={handleSave} className="flex flex-col gap-3 w-full max-w-xs">
               <label className="font-semibold text-yellow-800">Name</label>
@@ -182,13 +206,14 @@ export default function Profile() {
             <div className="flex flex-col items-center gap-2 w-full max-w-xs">
               <div className="text-lg font-bold text-yellow-900">{profile.name}</div>
               <div className="text-sm text-yellow-800">Contact: {profile.contact}</div>
+              <div className="text-sm text-yellow-800">Email: {profile.email}</div>
+              <div className="text-xs text-yellow-700 break-all">User ID: {profile.id}</div>
               <button
                 className="mt-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-6 rounded-lg transition"
                 onClick={() => setEditing(true)}
               >
                 Edit Profile
               </button>
-              {/* Logout Button */}
               <button
                 className="mt-2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg transition"
                 onClick={handleLogout}
@@ -199,6 +224,6 @@ export default function Profile() {
           )}
         </div>
       </PageContainer>
-    </div>
+    </BackgroundWrapper>
   );
 }

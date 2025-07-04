@@ -28,7 +28,12 @@ export default function Tasks() {
   }
 
   async function fetchMembers() {
-    const { data, error } = await supabase.from("users").select("name, photo");
+    // Only include users who have a name (i.e., have logged in and set up their profile)
+    const { data, error } = await supabase
+      .from("users")
+      .select("name, photo")
+      .not("name", "is", null)
+      .neq("name", "");
     if (!error) setMembers(data || []);
   }
 

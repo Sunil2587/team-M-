@@ -47,7 +47,7 @@ export default function App() {
   const hideNotifications = location.pathname === "/login" || location.pathname === "/signup";
 
   return (
-    <div className="min-h-screen bg-[#2D0900] text-[#FFD700]">
+    <div className="min-h-screen bg-[#2D0900] text-[#FFD700] flex flex-col pb-16">
       {!hideNavbar && <Navbar />}
       {!hideNotifications && <NotificationListener />}
       <Routes>
