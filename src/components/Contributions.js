@@ -52,7 +52,7 @@ export default function Contributions() {
     setLoading(true);
     try {
       const res = await fetch(
-        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/create-payment",
+        "https://ttdctwfsfvlizsjvsjfo.supabase.co/functions/v1/create-payment",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
