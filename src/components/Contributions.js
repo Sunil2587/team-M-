@@ -1,174 +1,198 @@
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
+import PageContainer from "../components/PageContainer";
+import BackgroundWrapper from "../components/BackgroundWrapper";
 import { supabase } from "../supabaseClient";
 
+const getDefaultContributor = () => localStorage.getItem("profileName") || "";
+
 export default function Contributions() {
-  const [mode, setMode] = useState("");
+  const [contributions, setContributions] = useState([]);
+  const [contributor, setContributor] = useState(getDefaultContributor());
   const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
+  const [paymentMode, setPaymentMode] = useState("cash");
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
 
-  async function handleCashContribution(e) {
+  useEffect(() => {
+    fetchContributions();
+    handleRedirectPayment();
+  }, []);
+
+  async function fetchContributions() {
+    const { data, error } = await supabase
+      .from("contributions")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!error) setContributions(data || []);
+  }
+
+  async function handleAddContribution(e) {
     e.preventDefault();
+    if (!contributor || !amount) return;
     setLoading(true);
-    setMsg("");
-
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setMsg("Please log in to contribute.");
-      setLoading(false);
-      return;
-    }
-
     const { error } = await supabase.from("contributions").insert([
       {
-        user_id: user.id,
+        contributor,
         amount: parseFloat(amount),
         method: "cash",
-        note
-      }
+        status: "success",
+        note: "Paid in cash",
+      },
     ]);
-
     setLoading(false);
-    if (error) setMsg(error.message);
-    else setMsg("Cash contribution recorded!");
-    setAmount("");
-    setNote("");
-    setMode("");
+    if (!error) {
+      setAmount("");
+      fetchContributions();
+    }
   }
 
   async function handleOnlinePayment(e) {
     e.preventDefault();
+    if (!contributor || !amount) return;
+    localStorage.setItem("profileName", contributor);
     setLoading(true);
-    setMsg("");
-
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-    const session = await supabase.auth.getSession();
-    const accessToken = session?.data?.session?.access_token;
-
-    if (!user || !accessToken) {
-      setMsg("Please log in to contribute.");
-      setLoading(false);
-      return;
-    }
-
     try {
-      const { data, error } = await supabase.functions.invoke("create-payment", {
-        body: {
-          amount: parseFloat(amount),
-          customer_id: user.id,
-          customer_name: user.user_metadata?.name || user.email,
-          customer_email: user.email,
-          customer_phone: "9999999999"
-        },
-        headers: {
-          Authorization: `Bearer ${accessToken}`
+      const res = await fetch(
+        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/create-payment",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contributor,
+            amount,
+            return_url: `https://team-m-git-main-sunils-projects-a499b59e.vercel.app/contributions`,
+          }),
         }
-      });
-
-      if (error || !data?.payment_session_id) {
-        console.error("❌ Payment failed", error);
-        setMsg("Failed to initiate payment.");
-        setLoading(false);
-        return;
-      }
-
-      if (window.Cashfree && typeof window.Cashfree === "function") {
-        const cashfree = window.Cashfree({ mode: "production" });
-        cashfree.checkout({
-          paymentSessionId: data.payment_session_id,
-          redirectTarget: "_self"
-        });
-      } else {
-        setMsg("Cashfree SDK not loaded properly.");
-      }
+      );
+      const { payment_link } = await res.json();
+      window.location.href = payment_link;
     } catch (err) {
-      console.error("Payment error:", err);
-      setMsg("Payment initiation failed.");
+      alert("Error starting payment.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
+  async function handleRedirectPayment() {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    const payment_id = params.get("payment_id");
+    const amount = params.get("amount");
+    const contributor = localStorage.getItem("profileName");
+
+    if (status === "success" && payment_id && contributor && amount) {
+      const { error } = await supabase.from("contributions").insert([
+        {
+          contributor,
+          amount: parseFloat(amount),
+          method: "online",
+          status: "success",
+          payment_id,
+          note: "Paid via Cashfree",
+        },
+      ]);
+      if (!error) fetchContributions();
+    }
+  }
+
+  async function handleDeleteContribution(id) {
+    if (!window.confirm("Delete this contribution?")) return;
+    const { error } = await supabase.from("contributions").delete().eq("id", id);
+    if (!error) fetchContributions();
+  }
+
+  const totalContribution = contributions.reduce(
+    (sum, c) => sum + (parseFloat(c.amount) || 0),
+    0
+  );
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-yellow-50 py-12">
-      <h2 className="text-2xl font-bold mb-6 text-yellow-900">
-        Contribute to Team Mahodara
-      </h2>
-      <div className="flex gap-4 mb-8">
-        <button
-          className={`px-6 py-2 rounded-lg font-bold ${
-            mode === "online"
-              ? "bg-yellow-500 text-white"
-              : "bg-white border border-yellow-400 text-yellow-800"
-          }`}
-          onClick={() => setMode("online")}
-        >
-          Pay Online
-        </button>
-        <button
-          className={`px-6 py-2 rounded-lg font-bold ${
-            mode === "cash"
-              ? "bg-yellow-500 text-white"
-              : "bg-white border border-yellow-400 text-yellow-800"
-          }`}
-          onClick={() => setMode("cash")}
-        >
-          Add Cash Contribution
-        </button>
-      </div>
-      {mode && (
+    <BackgroundWrapper>
+      <PageContainer title="CONTRIBUTIONS">
+        <div className="flex justify-center gap-4 mb-2">
+          <button
+            onClick={() => setPaymentMode("cash")}
+            className={`px-4 py-2 rounded ${
+              paymentMode === "cash" ? "bg-yellow-500 text-white" : "bg-gray-200"
+            }`}
+          >
+            Pay Cash
+          </button>
+          <button
+            onClick={() => setPaymentMode("online")}
+            className={`px-4 py-2 rounded ${
+              paymentMode === "online" ? "bg-yellow-500 text-white" : "bg-gray-200"
+            }`}
+          >
+            Pay Online
+          </button>
+        </div>
+
         <form
-          className="bg-white rounded-xl shadow-lg border-2 border-yellow-400 p-8 w-full max-w-sm flex flex-col gap-4"
-          onSubmit={mode === "online" ? handleOnlinePayment : handleCashContribution}
+          onSubmit={paymentMode === "cash" ? handleAddContribution : handleOnlinePayment}
+          className="flex flex-col gap-2 px-4 pb-4"
         >
+          <input
+            type="text"
+            placeholder="Contributor Name"
+            className="rounded-lg px-3 py-2 border border-yellow-400 bg-white/70 focus:outline-none text-black"
+            value={contributor}
+            onChange={(e) => {
+              setContributor(e.target.value);
+              localStorage.setItem("profileName", e.target.value);
+            }}
+            required
+          />
           <input
             type="number"
             min="1"
-            step="1"
+            step="0.01"
+            placeholder="Amount"
             className="rounded-lg px-3 py-2 border border-yellow-400 bg-white/70 focus:outline-none text-black"
-            placeholder="Amount (INR)"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             required
-          />
-          <textarea
-            className="rounded-lg px-3 py-2 border border-yellow-400 bg-white/70 focus:outline-none text-black"
-            placeholder="Note (optional)"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
           />
           <button
             type="submit"
             disabled={loading}
             className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 rounded-lg transition"
           >
-            {loading
-              ? "Processing..."
-              : mode === "online"
-              ? "Pay & Contribute"
-              : "Add Cash Contribution"}
+            {loading ? "Processing..." : paymentMode === "cash" ? "Add Cash Contribution" : "Pay Online"}
           </button>
-          <button
-            type="button"
-            className="bg-gray-300 hover:bg-gray-400 text-black font-bold py-2 rounded-lg transition"
-            onClick={() => {
-              setMode("");
-              setAmount("");
-              setNote("");
-              setMsg("");
-            }}
-          >
-            Cancel
-          </button>
-          {msg && <div className="text-xs mt-2 text-red-600">{msg}</div>}
         </form>
-      )}
-    </div>
+
+        <div className="text-center text-yellow-900 font-bold mb-2">
+          Total Contribution: ₹{totalContribution}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 px-3 pb-8 mt-4">
+          {contributions.map((c) => (
+            <div
+              key={c.id}
+              className="relative rounded-xl shadow p-2 flex flex-col items-center justify-center gap-1 transition"
+              style={{
+                minHeight: "54px",
+                fontSize: "0.95rem",
+                background: "rgba(255,255,255,0.35)",
+                backdropFilter: "blur(2px)",
+                color: "#166534",
+              }}
+            >
+              <span className="text-xl mb-0.5" style={{ color: "#388e3c" }}>₹</span>
+              <span className="text-xs font-semibold">{c.contributor}</span>
+              <span className="text-sm font-bold mt-0.5">{c.amount}</span>
+              <span className="text-xs text-gray-700">{c.method.toUpperCase()}</span>
+              <button
+                onClick={() => handleDeleteContribution(c.id)}
+                className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full px-2 py-1 text-xs font-bold shadow transition"
+                title="Delete"
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      </PageContainer>
+    </BackgroundWrapper>
   );
 }
