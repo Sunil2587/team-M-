@@ -7,23 +7,19 @@ export default function Contributions() {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
-  const [sdkLoaded, setSdkLoaded] = useState(false);
+  const [cashfreeReady, setCashfreeReady] = useState(false);
 
-  // ✅ Load Cashfree SDK and wait until it's ready
+  // Load Cashfree SDK
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://sdk.cashfree.com/js/ui/2.0.0/cashfree.prod.js";
-    script.async = true;
-
     script.onload = () => {
-      setSdkLoaded(true);
+      setCashfreeReady(true);
       console.log("✅ Cashfree SDK loaded");
     };
-
     script.onerror = () => {
-      setMsg("❌ Failed to load Cashfree SDK");
+      console.error("❌ Failed to load Cashfree SDK");
     };
-
     document.body.appendChild(script);
   }, []);
 
@@ -31,7 +27,6 @@ export default function Contributions() {
     e.preventDefault();
     setLoading(true);
     setMsg("");
-
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setMsg("Please log in to contribute.");
@@ -44,13 +39,13 @@ export default function Contributions() {
         user_id: user.id,
         amount: parseFloat(amount),
         method: "cash",
-        note
-      }
+        note,
+      },
     ]);
 
     setLoading(false);
     if (error) setMsg(error.message);
-    else setMsg("✅ Cash contribution recorded!");
+    else setMsg("Cash contribution recorded!");
     setAmount("");
     setNote("");
     setMode("");
@@ -60,16 +55,9 @@ export default function Contributions() {
     e.preventDefault();
     setLoading(true);
     setMsg("");
-
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setMsg("Please log in to contribute.");
-      setLoading(false);
-      return;
-    }
-
-    if (!sdkLoaded || typeof window.Cashfree?.checkout !== "function") {
-      setMsg("❌ Cashfree SDK not ready.");
       setLoading(false);
       return;
     }
@@ -85,22 +73,29 @@ export default function Contributions() {
         }
       });
 
-      console.log("✅ Payment API response:", data);
-
       if (!data?.payment_session_id) {
-        setMsg("❌ Failed to initiate payment.");
+        setMsg("Failed to initiate payment.");
         setLoading(false);
         return;
       }
 
-      window.Cashfree.checkout({
+      if (!cashfreeReady || !window.Cashfree) {
+        console.error("❌ Cashfree SDK not ready.");
+        setMsg("Cashfree SDK not ready.");
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Create instance and open checkout
+      const cashfree = new window.Cashfree();
+      cashfree.checkout({
         paymentSessionId: data.payment_session_id,
         redirectTarget: "_self"
       });
 
     } catch (err) {
       console.error("Payment error:", err);
-      setMsg("❌ Payment initiation failed.");
+      setMsg("Payment initiation failed.");
     }
 
     setLoading(false);
@@ -108,34 +103,21 @@ export default function Contributions() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-yellow-50 py-12">
-      <h2 className="text-2xl font-bold mb-6 text-yellow-900">
-        Contribute to Team Mahodara
-      </h2>
-
+      <h2 className="text-2xl font-bold mb-6 text-yellow-900">Contribute to Team Mahodara</h2>
       <div className="flex gap-4 mb-8">
         <button
-          className={`px-6 py-2 rounded-lg font-bold ${
-            mode === "online"
-              ? "bg-yellow-500 text-white"
-              : "bg-white border border-yellow-400 text-yellow-800"
-          }`}
+          className={`px-6 py-2 rounded-lg font-bold ${mode === "online" ? "bg-yellow-500 text-white" : "bg-white border border-yellow-400 text-yellow-800"}`}
           onClick={() => setMode("online")}
         >
           Pay Online
         </button>
-
         <button
-          className={`px-6 py-2 rounded-lg font-bold ${
-            mode === "cash"
-              ? "bg-yellow-500 text-white"
-              : "bg-white border border-yellow-400 text-yellow-800"
-          }`}
+          className={`px-6 py-2 rounded-lg font-bold ${mode === "cash" ? "bg-yellow-500 text-white" : "bg-white border border-yellow-400 text-yellow-800"}`}
           onClick={() => setMode("cash")}
         >
           Add Cash Contribution
         </button>
       </div>
-
       {mode && (
         <form
           className="bg-white rounded-xl shadow-lg border-2 border-yellow-400 p-8 w-full max-w-sm flex flex-col gap-4"
@@ -151,14 +133,12 @@ export default function Contributions() {
             onChange={(e) => setAmount(e.target.value)}
             required
           />
-
           <textarea
             className="rounded-lg px-3 py-2 border border-yellow-400 bg-white/70 focus:outline-none text-black"
             placeholder="Note (optional)"
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
-
           <button
             type="submit"
             disabled={loading}
@@ -170,7 +150,6 @@ export default function Contributions() {
               ? "Pay & Contribute"
               : "Add Cash Contribution"}
           </button>
-
           <button
             type="button"
             className="bg-gray-300 hover:bg-gray-400 text-black font-bold py-2 rounded-lg transition"
@@ -183,7 +162,6 @@ export default function Contributions() {
           >
             Cancel
           </button>
-
           {msg && <div className="text-xs mt-2 text-red-600">{msg}</div>}
         </form>
       )}
