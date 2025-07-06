@@ -59,12 +59,17 @@ export default function Contributions() {
           body: JSON.stringify({
             contributor,
             amount,
-            return_url: `https://team-m-git-main-sunils-projects-a499b59e.vercel.app/contributions`,
+            return_url:
+              "https://team-m-git-main-sunils-projects-a499b59e.vercel.app/contributions",
           }),
         }
       );
-      const { payment_link } = await res.json();
-      window.location.href = payment_link;
+      const data = await res.json();
+      if (data.payment_link) {
+        window.location.href = data.payment_link;
+      } else {
+        alert("Payment initiation failed.");
+      }
     } catch (err) {
       alert("Error starting payment.");
     } finally {
@@ -157,7 +162,11 @@ export default function Contributions() {
             disabled={loading}
             className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 rounded-lg transition"
           >
-            {loading ? "Processing..." : paymentMode === "cash" ? "Add Cash Contribution" : "Pay Online"}
+            {loading
+              ? "Processing..."
+              : paymentMode === "cash"
+              ? "Add Cash Contribution"
+              : "Pay Online"}
           </button>
         </form>
 
