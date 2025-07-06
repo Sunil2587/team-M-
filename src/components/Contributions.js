@@ -14,7 +14,7 @@ export default function Contributions() {
     setMsg("");
 
     const {
-      data: { user },
+      data: { user }
     } = await supabase.auth.getUser();
 
     if (!user) {
@@ -28,13 +28,13 @@ export default function Contributions() {
         user_id: user.id,
         amount: parseFloat(amount),
         method: "cash",
-        note,
-      },
+        note
+      }
     ]);
 
     setLoading(false);
     if (error) setMsg(error.message);
-    else setMsg("✅ Cash contribution recorded!");
+    else setMsg("Cash contribution recorded!");
     setAmount("");
     setNote("");
     setMode("");
@@ -46,57 +46,50 @@ export default function Contributions() {
     setMsg("");
 
     const {
-      data: { user },
+      data: { user }
     } = await supabase.auth.getUser();
+    const session = await supabase.auth.getSession();
+    const accessToken = session?.data?.session?.access_token;
 
-    if (!user) {
+    if (!user || !accessToken) {
       setMsg("Please log in to contribute.");
       setLoading(false);
       return;
     }
 
     try {
-      const { data } = await supabase.functions.invoke("create-payment", {
+      const { data, error } = await supabase.functions.invoke("create-payment", {
         body: {
           amount: parseFloat(amount),
           customer_id: user.id,
           customer_name: user.user_metadata?.name || user.email,
           customer_email: user.email,
-          customer_phone: "9999999999",
+          customer_phone: "9999999999"
         },
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
       });
 
-      if (!data?.payment_session_id) {
-        setMsg("❌ Failed to initiate payment.");
+      if (error || !data?.payment_session_id) {
+        console.error("❌ Payment failed", error);
+        setMsg("Failed to initiate payment.");
         setLoading(false);
         return;
       }
 
-      // ✅ Load Cashfree PG SDK dynamically if not already loaded
-      if (!window.Cashfree) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
-          script.onload = resolve;
-          script.onerror = reject;
-          document.body.appendChild(script);
-        });
-      }
-
-      // ✅ Call Cashfree Checkout
-      if (window.Cashfree && window.Cashfree.checkout) {
-        window.Cashfree.checkout({
+      if (window.Cashfree && typeof window.Cashfree === "function") {
+        const cashfree = window.Cashfree({ mode: "production" });
+        cashfree.checkout({
           paymentSessionId: data.payment_session_id,
-          returnUrl: true,
-          redirectTarget: "_self",
+          redirectTarget: "_self"
         });
       } else {
-        setMsg("❌ Cashfree SDK not loaded properly.");
-        console.error("Cashfree SDK not ready");
+        setMsg("Cashfree SDK not loaded properly.");
       }
     } catch (err) {
       console.error("Payment error:", err);
-      setMsg("❌ Payment initiation failed.");
+      setMsg("Payment initiation failed.");
     }
 
     setLoading(false);
@@ -129,13 +122,10 @@ export default function Contributions() {
           Add Cash Contribution
         </button>
       </div>
-
       {mode && (
         <form
           className="bg-white rounded-xl shadow-lg border-2 border-yellow-400 p-8 w-full max-w-sm flex flex-col gap-4"
-          onSubmit={
-            mode === "online" ? handleOnlinePayment : handleCashContribution
-          }
+          onSubmit={mode === "online" ? handleOnlinePayment : handleCashContribution}
         >
           <input
             type="number"
