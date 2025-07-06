@@ -2,21 +2,31 @@ import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 
 export default function Contributions() {
-  const [mode, setMode] = useState(""); // 'cash' or 'online'
+  const [mode, setMode] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const [sdkLoaded, setSdkLoaded] = useState(false);
 
-  // ✅ Load Cashfree SDK dynamically
+  // ✅ Load Cashfree SDK and wait until it's ready
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://sdk.cashfree.com/js/ui/2.0.0/cashfree.prod.js";
     script.async = true;
+
+    script.onload = () => {
+      setSdkLoaded(true);
+      console.log("✅ Cashfree SDK loaded");
+    };
+
+    script.onerror = () => {
+      setMsg("❌ Failed to load Cashfree SDK");
+    };
+
     document.body.appendChild(script);
   }, []);
 
-  // ✅ Handle cash contributions
   async function handleCashContribution(e) {
     e.preventDefault();
     setLoading(true);
@@ -46,7 +56,6 @@ export default function Contributions() {
     setMode("");
   }
 
-  // ✅ Handle online contributions via Cashfree
   async function handleOnlinePayment(e) {
     e.preventDefault();
     setLoading(true);
@@ -55,6 +64,12 @@ export default function Contributions() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setMsg("Please log in to contribute.");
+      setLoading(false);
+      return;
+    }
+
+    if (!sdkLoaded || typeof window.Cashfree?.checkout !== "function") {
+      setMsg("❌ Cashfree SDK not ready.");
       setLoading(false);
       return;
     }
@@ -78,11 +93,11 @@ export default function Contributions() {
         return;
       }
 
-      // ✅ Call Cashfree.checkout directly
       window.Cashfree.checkout({
         paymentSessionId: data.payment_session_id,
-        redirectTarget: "_self",
+        redirectTarget: "_self"
       });
+
     } catch (err) {
       console.error("Payment error:", err);
       setMsg("❌ Payment initiation failed.");
