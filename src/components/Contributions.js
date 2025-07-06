@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "../supabaseClient";
 
 export default function Contributions() {
@@ -7,27 +7,16 @@ export default function Contributions() {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
-  const [cashfreeReady, setCashfreeReady] = useState(false);
-
-  // Load Cashfree SDK
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://sdk.cashfree.com/js/ui/2.0.0/cashfree.prod.js";
-    script.onload = () => {
-      setCashfreeReady(true);
-      console.log("✅ Cashfree SDK loaded");
-    };
-    script.onerror = () => {
-      console.error("❌ Failed to load Cashfree SDK");
-    };
-    document.body.appendChild(script);
-  }, []);
 
   async function handleCashContribution(e) {
     e.preventDefault();
     setLoading(true);
     setMsg("");
-    const { data: { user } } = await supabase.auth.getUser();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
       setMsg("Please log in to contribute.");
       setLoading(false);
@@ -45,7 +34,7 @@ export default function Contributions() {
 
     setLoading(false);
     if (error) setMsg(error.message);
-    else setMsg("Cash contribution recorded!");
+    else setMsg("✅ Cash contribution recorded!");
     setAmount("");
     setNote("");
     setMode("");
@@ -55,7 +44,11 @@ export default function Contributions() {
     e.preventDefault();
     setLoading(true);
     setMsg("");
-    const { data: { user } } = await supabase.auth.getUser();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user) {
       setMsg("Please log in to contribute.");
       setLoading(false);
@@ -69,33 +62,41 @@ export default function Contributions() {
           customer_id: user.id,
           customer_name: user.user_metadata?.name || user.email,
           customer_email: user.email,
-          customer_phone: "9999999999"
-        }
+          customer_phone: "9999999999",
+        },
       });
 
       if (!data?.payment_session_id) {
-        setMsg("Failed to initiate payment.");
+        setMsg("❌ Failed to initiate payment.");
         setLoading(false);
         return;
       }
 
-      if (!cashfreeReady || !window.Cashfree) {
-        console.error("❌ Cashfree SDK not ready.");
-        setMsg("Cashfree SDK not ready.");
-        setLoading(false);
-        return;
+      // ✅ Load Cashfree PG SDK dynamically if not already loaded
+      if (!window.Cashfree) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+          script.onload = resolve;
+          script.onerror = reject;
+          document.body.appendChild(script);
+        });
       }
 
-      // ✅ Create instance and open checkout
-      const cashfree = new window.Cashfree();
-      cashfree.checkout({
-        paymentSessionId: data.payment_session_id,
-        redirectTarget: "_self"
-      });
-
+      // ✅ Call Cashfree Checkout
+      if (window.Cashfree && window.Cashfree.checkout) {
+        window.Cashfree.checkout({
+          paymentSessionId: data.payment_session_id,
+          returnUrl: true,
+          redirectTarget: "_self",
+        });
+      } else {
+        setMsg("❌ Cashfree SDK not loaded properly.");
+        console.error("Cashfree SDK not ready");
+      }
     } catch (err) {
       console.error("Payment error:", err);
-      setMsg("Payment initiation failed.");
+      setMsg("❌ Payment initiation failed.");
     }
 
     setLoading(false);
@@ -103,25 +104,38 @@ export default function Contributions() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-yellow-50 py-12">
-      <h2 className="text-2xl font-bold mb-6 text-yellow-900">Contribute to Team Mahodara</h2>
+      <h2 className="text-2xl font-bold mb-6 text-yellow-900">
+        Contribute to Team Mahodara
+      </h2>
       <div className="flex gap-4 mb-8">
         <button
-          className={`px-6 py-2 rounded-lg font-bold ${mode === "online" ? "bg-yellow-500 text-white" : "bg-white border border-yellow-400 text-yellow-800"}`}
+          className={`px-6 py-2 rounded-lg font-bold ${
+            mode === "online"
+              ? "bg-yellow-500 text-white"
+              : "bg-white border border-yellow-400 text-yellow-800"
+          }`}
           onClick={() => setMode("online")}
         >
           Pay Online
         </button>
         <button
-          className={`px-6 py-2 rounded-lg font-bold ${mode === "cash" ? "bg-yellow-500 text-white" : "bg-white border border-yellow-400 text-yellow-800"}`}
+          className={`px-6 py-2 rounded-lg font-bold ${
+            mode === "cash"
+              ? "bg-yellow-500 text-white"
+              : "bg-white border border-yellow-400 text-yellow-800"
+          }`}
           onClick={() => setMode("cash")}
         >
           Add Cash Contribution
         </button>
       </div>
+
       {mode && (
         <form
           className="bg-white rounded-xl shadow-lg border-2 border-yellow-400 p-8 w-full max-w-sm flex flex-col gap-4"
-          onSubmit={mode === "online" ? handleOnlinePayment : handleCashContribution}
+          onSubmit={
+            mode === "online" ? handleOnlinePayment : handleCashContribution
+          }
         >
           <input
             type="number"
