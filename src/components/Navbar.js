@@ -6,8 +6,13 @@ import {
   PhotoIcon,
   UserGroupIcon,
   ChatBubbleLeftRightIcon,
+  Cog6ToothIcon,
 } from "@heroicons/react/24/solid";
 import { Link, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+
+// Set your admin email here
+const ADMIN_EMAIL = "youradmin@email.com";
 
 const navItems = [
   { to: "/", icon: <HomeIcon className="w-6 h-6" />, label: "" },
@@ -21,6 +26,14 @@ const navItems = [
 
 export default function BottomNavBar() {
   const location = useLocation();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Optional: Show admin icon if logged-in user is admin
+  useEffect(() => {
+    // Check localStorage for user's email (set this on login)
+    const email = localStorage.getItem("userEmail");
+    setIsAdmin(email === ADMIN_EMAIL);
+  }, []);
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 w-[430px] max-w-[95vw] pb-2">
@@ -41,9 +54,23 @@ export default function BottomNavBar() {
             }`}
           >
             {item.icon}
-            <span className="mt-1 text-[10px]">{item.label}</span>
+            {/* If you want to show labels, add: <span className="mt-1 text-[10px]">{item.label}</span> */}
           </Link>
         ))}
+        {/* Optional: Admin icon only for admin user */}
+        {isAdmin && (
+          <Link
+            to="/admin"
+            className={`flex flex-col items-center ${
+              location.pathname === "/admin"
+                ? "text-[#E65100]"
+                : "text-gray-500"
+            }`}
+            title="Admin Panel"
+          >
+            <Cog6ToothIcon className="w-6 h-6" />
+          </Link>
+        )}
       </div>
     </nav>
   );

@@ -2,11 +2,11 @@ import React, { useEffect, useState } from "react";
 import PageContainer from "../components/PageContainer";
 import BackgroundWrapper from "../components/BackgroundWrapper";
 import { supabase } from "../supabaseClient";
-import { FaCamera, FaTrash } from "react-icons/fa"; // <-- FaTrash for delete icon
+import { FaCamera, FaTrash } from "react-icons/fa";
 
 export default function Gallery() {
   const [gallery, setGallery] = useState([]);
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
 
   // Get today's date as YYYY-MM-DD
@@ -31,41 +31,43 @@ export default function Gallery() {
 
   async function handleUpload(e) {
     e.preventDefault();
-    if (!file) return;
+    if (!files || files.length === 0) return;
     setUploading(true);
 
-    // Upload to Supabase Storage in a folder named by today's date
-    const filePath = `${todayFolder}/${Date.now()}_${file.name}`;
-    let uploadRes = await supabase.storage.from("gallery-images").upload(filePath, file);
+    const uploaded = [];
+    for (const file of files) {
+      const filePath = `${todayFolder}/${Date.now()}_${file.name}`;
+      let uploadRes = await supabase.storage.from("gallery-images").upload(filePath, file);
 
-    if (uploadRes.error) {
-      console.error("Upload failed!", uploadRes.error.message);
-      alert("Upload failed!");
-      setUploading(false);
-      return;
+      if (uploadRes.error) {
+        console.error("Upload failed!", uploadRes.error.message);
+        alert(`Upload failed for ${file.name}!`);
+        continue;
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage.from("gallery-images").getPublicUrl(filePath);
+      const url = publicUrlData?.publicUrl;
+      if (!url) {
+        alert(`Could not get public URL for ${file.name}.`);
+        continue;
+      }
+
+      // Save to gallery table
+      const { error } = await supabase.from("gallery").insert([{ url }]);
+      if (error) {
+        console.error("Failed to save to gallery table:", error.message);
+        alert(`Failed to save ${file.name} to gallery table!`);
+        continue;
+      }
+      uploaded.push(file.name);
     }
-
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage.from("gallery-images").getPublicUrl(filePath);
-    const url = publicUrlData?.publicUrl;
-    if (!url) {
-      alert("Could not get public URL for uploaded image.");
-      setUploading(false);
-      return;
-    }
-
-    // Save to gallery table
-    const { error } = await supabase.from("gallery").insert([
-      { url }
-    ]);
     setUploading(false);
-    if (error) {
-      console.error("Failed to save to gallery table:", error.message);
-      alert("Failed to save to gallery table!");
-      return;
-    }
-    setFile(null);
+    setFiles([]);
     fetchGallery();
+    if (uploaded.length > 0) {
+      alert(`Uploaded: ${uploaded.join(", ")}`);
+    }
   }
 
   async function handleDelete(item) {
@@ -100,13 +102,19 @@ export default function Gallery() {
                   type="file"
                   accept="image/*,video/*"
                   className="hidden"
-                  onChange={e => setFile(e.target.files[0])}
+                  multiple
+                  onChange={e => setFiles(Array.from(e.target.files))}
                   disabled={uploading}
                 />
               </label>
+              {files && files.length > 0 && (
+                <div className="text-xs text-gray-700 mt-1 max-w-[80px] break-words">
+                  {files.map(f => f.name).join(", ")}
+                </div>
+              )}
               <button
                 type="submit"
-                disabled={uploading || !file}
+                disabled={uploading || !files || files.length === 0}
                 className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded px-2 py-0.5 text-xs mt-1 transition"
                 style={{ width: "56px" }}
               >

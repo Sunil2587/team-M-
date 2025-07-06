@@ -13,6 +13,7 @@ import Info from "./components/Info";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
 import NotificationListener from "./components/NotificationListener";
+import AdminApprove from "./components/AdminApprove";
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 
@@ -80,6 +81,7 @@ export default function App() {
             </AuthGuard>
           }
         />
+        <Route path="/admin" element={<AdminApprove />} />
         <Route
           path="/tasks"
           element={
