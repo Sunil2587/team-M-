@@ -2,18 +2,27 @@ import { useState } from "react";
 import { supabase } from "../supabaseClient";
 
 export default function Contributions() {
-  const [mode, setMode] = useState("");
+  const [mode, setMode] = useState(""); // 'cash' or 'online'
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
+  // Handle cash contributions
   async function handleCashContribution(e) {
     e.preventDefault();
     setLoading(true);
     setMsg("");
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setMsg("Please enter a valid amount.");
+      setLoading(false);
+      return;
+    }
+
     const {
-      data: { user }
+      data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
@@ -25,26 +34,35 @@ export default function Contributions() {
     const { error } = await supabase.from("contributions").insert([
       {
         user_id: user.id,
-        amount: parseFloat(amount),
+        amount: parsedAmount,
         method: "cash",
-        note
-      }
+        note,
+      },
     ]);
 
     setLoading(false);
     if (error) setMsg(error.message);
-    else setMsg("Cash contribution recorded!");
+    else setMsg("✅ Cash contribution recorded!");
     setAmount("");
     setNote("");
     setMode("");
   }
 
+  // Handle online payment
   async function handleOnlinePayment(e) {
     e.preventDefault();
     setLoading(true);
     setMsg("");
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setMsg("Please enter a valid amount.");
+      setLoading(false);
+      return;
+    }
+
     const {
-      data: { user }
+      data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
@@ -56,29 +74,30 @@ export default function Contributions() {
     try {
       const { data } = await supabase.functions.invoke("create-payment", {
         body: {
-          amount: parseFloat(amount),
+          amount: parsedAmount,
           customer_id: user.id,
           customer_name: user.user_metadata?.name || user.email,
           customer_email: user.email,
-          customer_phone: "9999999999"
-        }
+          customer_phone: "9999999999", // optional: replace with real phone
+        },
       });
 
       if (!data?.payment_session_id) {
-        setMsg("Failed to initiate payment.");
+        setMsg("❌ Failed to initiate payment.");
         setLoading(false);
         return;
       }
 
-      const cashfree = window.Cashfree({ mode: "production" });
+      const cashfree = window.Cashfree({ mode: "production" }); // LIVE mode
       cashfree.checkout({
         paymentSessionId: data.payment_session_id,
-        redirectTarget: "_self"
+        redirectTarget: "_self",
       });
     } catch (err) {
       console.error("Payment error:", err);
-      setMsg("Payment initiation failed.");
+      setMsg("❌ Payment initiation failed.");
     }
+
     setLoading(false);
   }
 
@@ -87,6 +106,7 @@ export default function Contributions() {
       <h2 className="text-2xl font-bold mb-6 text-yellow-900">
         Contribute to Team Mahodara
       </h2>
+
       <div className="flex gap-4 mb-8">
         <button
           className={`px-6 py-2 rounded-lg font-bold ${
@@ -95,6 +115,7 @@ export default function Contributions() {
               : "bg-white border border-yellow-400 text-yellow-800"
           }`}
           onClick={() => setMode("online")}
+          disabled={loading}
         >
           Pay Online
         </button>
@@ -105,10 +126,12 @@ export default function Contributions() {
               : "bg-white border border-yellow-400 text-yellow-800"
           }`}
           onClick={() => setMode("cash")}
+          disabled={loading}
         >
           Add Cash Contribution
         </button>
       </div>
+
       {mode && (
         <form
           className="bg-white rounded-xl shadow-lg border-2 border-yellow-400 p-8 w-full max-w-sm flex flex-col gap-4"
@@ -124,12 +147,14 @@ export default function Contributions() {
             onChange={(e) => setAmount(e.target.value)}
             required
           />
+
           <textarea
             className="rounded-lg px-3 py-2 border border-yellow-400 bg-white/70 focus:outline-none text-black"
             placeholder="Note (optional)"
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
+
           <button
             type="submit"
             disabled={loading}
@@ -141,6 +166,7 @@ export default function Contributions() {
               ? "Pay & Contribute"
               : "Add Cash Contribution"}
           </button>
+
           <button
             type="button"
             className="bg-gray-300 hover:bg-gray-400 text-black font-bold py-2 rounded-lg transition"
@@ -150,9 +176,11 @@ export default function Contributions() {
               setNote("");
               setMsg("");
             }}
+            disabled={loading}
           >
             Cancel
           </button>
+
           {msg && <div className="text-xs mt-2 text-red-600">{msg}</div>}
         </form>
       )}
