@@ -88,7 +88,8 @@ export default function Contributions() {
         return;
       }
 
-      const cashfree = window.Cashfree({ mode: "production" }); // LIVE mode
+      const cashfree = new window.Cashfree({ mode: "production" });
+ // LIVE mode
       cashfree.checkout({
         paymentSessionId: data.payment_session_id,
         redirectTarget: "_self",
