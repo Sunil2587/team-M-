@@ -1,10 +1,10 @@
+// File: pages/Contributions.js
 import React, { useEffect, useState } from "react";
 import PageContainer from "../components/PageContainer";
 import BackgroundWrapper from "../components/BackgroundWrapper";
 import { supabase } from "../supabaseClient";
 
-
- // set to false for production
+// Change for production
 const CREATE_PAYMENT_URL = "https://ttdctwfsfvlizsjvsjfo.functions.supabase.co/create-payment";
 const getDefaultContributor = () => localStorage.getItem("profileName") || "";
 
@@ -36,15 +36,13 @@ export default function Contributions() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("contributions").insert([
-      {
-        contributor,
-        amount: parseFloat(amount),
-        method: "cash",
-        status: "success",
-        note: "Paid in cash",
-      },
-    ]);
+    const { error } = await supabase.from("contributions").insert([{
+      contributor,
+      amount: parseFloat(amount),
+      method: "cash",
+      status: "success",
+      note: "Paid in cash",
+    }]);
     setLoading(false);
     if (!error) {
       setAmount("");
@@ -63,19 +61,18 @@ export default function Contributions() {
     localStorage.setItem("profileName", contributor);
     setLoading(true);
     try {
-      // Debug: log payload
       const payload = {
         contributor: contributor.trim(),
         amount: parseFloat(amount),
         return_url: window.location.origin + "/contributions",
       };
-      console.log("Sending payment payload:", payload);
 
       const res = await fetch(CREATE_PAYMENT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
       const data = await res.json();
       if (res.ok && data.payment_link) {
         window.location.href = data.payment_link;
@@ -96,16 +93,14 @@ export default function Contributions() {
     const contributor = localStorage.getItem("profileName");
 
     if (order_id && contributor && order_amount) {
-      const { error } = await supabase.from("contributions").insert([
-        {
-          contributor,
-          amount: parseFloat(order_amount),
-          method: "online",
-          status: "success",
-          payment_id: order_id,
-          note: "Paid via Cashfree",
-        },
-      ]);
+      const { error } = await supabase.from("contributions").insert([{
+        contributor,
+        amount: parseFloat(order_amount),
+        method: "online",
+        status: "success",
+        payment_id: order_id,
+        note: "Paid via Cashfree",
+      }]);
       if (!error) fetchContributions();
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -119,8 +114,7 @@ export default function Contributions() {
   }
 
   const totalContribution = contributions.reduce(
-    (sum, c) => sum + (parseFloat(c.amount) || 0),
-    0
+    (sum, c) => sum + (parseFloat(c.amount) || 0), 0
   );
 
   return (
@@ -129,32 +123,20 @@ export default function Contributions() {
         <div className="flex justify-center gap-4 mb-2">
           <button
             onClick={() => setPaymentMode("cash")}
-            className={`px-4 py-2 rounded ${
-              paymentMode === "cash"
-                ? "bg-yellow-500 text-white"
-                : "bg-gray-200"
-            }`}
+            className={`px-4 py-2 rounded ${paymentMode === "cash" ? "bg-yellow-500 text-white" : "bg-gray-200"}`}
           >
             Pay Cash
           </button>
           <button
             onClick={() => setPaymentMode("online")}
-            className={`px-4 py-2 rounded ${
-              paymentMode === "online"
-                ? "bg-yellow-500 text-white"
-                : "bg-gray-200"
-            }`}
+            className={`px-4 py-2 rounded ${paymentMode === "online" ? "bg-yellow-500 text-white" : "bg-gray-200"}`}
           >
             Pay Online
           </button>
         </div>
 
         <form
-          onSubmit={
-            paymentMode === "cash"
-              ? handleAddContribution
-              : handleOnlinePayment
-          }
+          onSubmit={paymentMode === "cash" ? handleAddContribution : handleOnlinePayment}
           className="flex flex-col gap-2 px-4 pb-4"
         >
           <input
@@ -183,11 +165,7 @@ export default function Contributions() {
             disabled={loading}
             className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 rounded-lg transition"
           >
-            {loading
-              ? "Processing..."
-              : paymentMode === "cash"
-              ? "Add Cash Contribution"
-              : "Pay Online"}
+            {loading ? "Processing..." : paymentMode === "cash" ? "Add Cash Contribution" : "Pay Online"}
           </button>
         </form>
 
@@ -208,21 +186,13 @@ export default function Contributions() {
                 color: "#166534",
               }}
             >
-              <span
-                className="text-xl mb-0.5"
-                style={{ color: "#388e3c" }}
-              >
-                ₹
-              </span>
+              <span className="text-xl mb-0.5" style={{ color: "#388e3c" }}>₹</span>
               <span className="text-xs font-semibold">{c.contributor}</span>
               <span className="text-sm font-bold mt-0.5">{c.amount}</span>
-              <span className="text-xs text-gray-700">
-                {c.method.toUpperCase()}
-              </span>
+              <span className="text-xs text-gray-700">{c.method.toUpperCase()}</span>
               <button
                 onClick={() => handleDeleteContribution(c.id)}
                 className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full px-2 py-1 text-xs font-bold shadow transition"
-                title="Delete"
               >
                 Delete
               </button>
