@@ -3,10 +3,9 @@ import PageContainer from "../components/PageContainer";
 import BackgroundWrapper from "../components/BackgroundWrapper";
 import { supabase } from "../supabaseClient";
 
-const IS_TEST = true; // set to false for production
-const CREATE_PAYMENT_URL = IS_TEST
-  ? "https://ttdctwfsfvlizsjvsjfo.functions.supabase.co/create-payment-test"
-  : "https://ttdctwfsfvlizsjvsjfo.functions.supabase.co/create-payment";
+
+const IS_TEST = false; // set to false for production
+const CREATE_PAYMENT_URL = "https://ttdctwfsfvlizsjvsjfo.functions.supabase.co/create-payment";
 const getDefaultContributor = () => localStorage.getItem("profileName") || "";
 
 export default function Contributions() {
