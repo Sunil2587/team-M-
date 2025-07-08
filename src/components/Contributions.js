@@ -3,6 +3,10 @@ import PageContainer from "../components/PageContainer";
 import BackgroundWrapper from "../components/BackgroundWrapper";
 import { supabase } from "../supabaseClient";
 
+const IS_TEST = true; // set to false for production
+const CREATE_PAYMENT_URL = IS_TEST
+  ? "https://ttdctwfsfvlizsjvsjfo.functions.supabase.co/create-payment-test"
+  : "https://ttdctwfsfvlizsjvsjfo.functions.supabase.co/create-payment";
 const getDefaultContributor = () => localStorage.getItem("profileName") || "";
 
 export default function Contributions() {
@@ -15,6 +19,7 @@ export default function Contributions() {
   useEffect(() => {
     fetchContributions();
     handleRedirectPayment();
+    // eslint-disable-next-line
   }, []);
 
   async function fetchContributions() {
@@ -27,7 +32,10 @@ export default function Contributions() {
 
   async function handleAddContribution(e) {
     e.preventDefault();
-    if (!contributor || !amount) return;
+    if (!contributor.trim() || !amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      alert("Please enter a valid contributor name and amount.");
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.from("contributions").insert([
       {
@@ -42,36 +50,41 @@ export default function Contributions() {
     if (!error) {
       setAmount("");
       fetchContributions();
+    } else {
+      alert("Failed to add cash contribution.");
     }
   }
 
   async function handleOnlinePayment(e) {
     e.preventDefault();
-    if (!contributor || !amount) return;
+    if (!contributor.trim() || !amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      alert("Please enter a valid contributor name and amount.");
+      return;
+    }
     localStorage.setItem("profileName", contributor);
     setLoading(true);
     try {
-      const res = await fetch(
-        "https://ttdctwfsfvlizsjvsjfo.supabase.co/functions/v1/create-payment",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contributor,
-            amount,
-            return_url:
-              "https://team-m-git-main-sunils-projects-a499b59e.vercel.app/contributions",
-          }),
-        }
-      );
+      // Debug: log payload
+      const payload = {
+        contributor: contributor.trim(),
+        amount: parseFloat(amount),
+        return_url: window.location.origin + "/contributions",
+      };
+      console.log("Sending payment payload:", payload);
+
+      const res = await fetch(CREATE_PAYMENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       const data = await res.json();
-      if (data.payment_link) {
+      if (res.ok && data.payment_link) {
         window.location.href = data.payment_link;
       } else {
-        alert("Payment initiation failed.");
+        alert("Payment initiation failed: " + (data.error || "Unknown error"));
       }
     } catch (err) {
-      alert("Error starting payment.");
+      alert("Error starting payment: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -79,23 +92,23 @@ export default function Contributions() {
 
   async function handleRedirectPayment() {
     const params = new URLSearchParams(window.location.search);
-    const status = params.get("status");
-    const payment_id = params.get("payment_id");
-    const amount = params.get("amount");
+    const order_id = params.get("order_id");
+    const order_amount = params.get("order_amount");
     const contributor = localStorage.getItem("profileName");
 
-    if (status === "success" && payment_id && contributor && amount) {
+    if (order_id && contributor && order_amount) {
       const { error } = await supabase.from("contributions").insert([
         {
           contributor,
-          amount: parseFloat(amount),
+          amount: parseFloat(order_amount),
           method: "online",
           status: "success",
-          payment_id,
+          payment_id: order_id,
           note: "Paid via Cashfree",
         },
       ]);
       if (!error) fetchContributions();
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }
 
@@ -103,6 +116,7 @@ export default function Contributions() {
     if (!window.confirm("Delete this contribution?")) return;
     const { error } = await supabase.from("contributions").delete().eq("id", id);
     if (!error) fetchContributions();
+    else alert("Failed to delete contribution.");
   }
 
   const totalContribution = contributions.reduce(
@@ -117,7 +131,9 @@ export default function Contributions() {
           <button
             onClick={() => setPaymentMode("cash")}
             className={`px-4 py-2 rounded ${
-              paymentMode === "cash" ? "bg-yellow-500 text-white" : "bg-gray-200"
+              paymentMode === "cash"
+                ? "bg-yellow-500 text-white"
+                : "bg-gray-200"
             }`}
           >
             Pay Cash
@@ -125,7 +141,9 @@ export default function Contributions() {
           <button
             onClick={() => setPaymentMode("online")}
             className={`px-4 py-2 rounded ${
-              paymentMode === "online" ? "bg-yellow-500 text-white" : "bg-gray-200"
+              paymentMode === "online"
+                ? "bg-yellow-500 text-white"
+                : "bg-gray-200"
             }`}
           >
             Pay Online
@@ -133,7 +151,11 @@ export default function Contributions() {
         </div>
 
         <form
-          onSubmit={paymentMode === "cash" ? handleAddContribution : handleOnlinePayment}
+          onSubmit={
+            paymentMode === "cash"
+              ? handleAddContribution
+              : handleOnlinePayment
+          }
           className="flex flex-col gap-2 px-4 pb-4"
         >
           <input
@@ -187,10 +209,17 @@ export default function Contributions() {
                 color: "#166534",
               }}
             >
-              <span className="text-xl mb-0.5" style={{ color: "#388e3c" }}>₹</span>
+              <span
+                className="text-xl mb-0.5"
+                style={{ color: "#388e3c" }}
+              >
+                ₹
+              </span>
               <span className="text-xs font-semibold">{c.contributor}</span>
               <span className="text-sm font-bold mt-0.5">{c.amount}</span>
-              <span className="text-xs text-gray-700">{c.method.toUpperCase()}</span>
+              <span className="text-xs text-gray-700">
+                {c.method.toUpperCase()}
+              </span>
               <button
                 onClick={() => handleDeleteContribution(c.id)}
                 className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full px-2 py-1 text-xs font-bold shadow transition"
