@@ -4,7 +4,7 @@ import BackgroundWrapper from "../components/BackgroundWrapper";
 import { supabase } from "../supabaseClient";
 
 
-const IS_TEST = false; // set to false for production
+ // set to false for production
 const CREATE_PAYMENT_URL = "https://ttdctwfsfvlizsjvsjfo.functions.supabase.co/create-payment";
 const getDefaultContributor = () => localStorage.getItem("profileName") || "";
 
