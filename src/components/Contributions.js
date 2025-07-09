@@ -5,7 +5,7 @@ import BackgroundWrapper from "../components/BackgroundWrapper";
 import { supabase } from "../supabaseClient";
 
 const CREATE_PAYMENT_URL =
-  "https://ttdctwfsfvlizsjvsjfo.functions.supabase.co/create-payment-fresh";
+  "https://ttdctwfsfvlizsjvsjfo.functions.supabase.co/create-payment";
 
 const getDefaultContributor = () => localStorage.getItem("profileName") || "";
 
